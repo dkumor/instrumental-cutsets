@@ -1,10 +1,11 @@
+import pyparsing as pp
 import networkx as nx
 
 
 def copyAttributes(A, B):
     for u in B:
-        if "latent" in A.node[u]:
-            B.node[u]["latent"] = True
+        if "latent" in A.nodes[u]:
+            B.nodes[u]["latent"] = True
 
 
 def vertexFlowGraph(G):
@@ -83,7 +84,7 @@ def closestMinCut(G, S, T):
 def flowGraph(G):
     fG = nx.DiGraph()
     for n in G:
-        if "latent" in G.node[n]:
+        if "latent" in G.nodes[n]:
             # Create the bidirected edge between the nodes
             conn = list(G.successors(n))
             fG.add_edge(conn[0], conn[1] + "'")
@@ -100,10 +101,10 @@ def flowGraph(G):
 def auxGraph(G, known=set()):
     aG = nx.DiGraph()
     for n in G:
-        if "latent" in G.node[n]:
+        if "latent" in G.nodes[n]:
             if not n in aG:
                 aG.add_node(n)
-            aG.node[n]["latent"] = True
+            aG.nodes[n]["latent"] = True
         else:
             aG.add_edge(n + "*", n)
             for pa in G.predecessors(n):
@@ -120,7 +121,7 @@ def auxFlowGraph(G, known=set()):
 
     # The auxiliary flow graph has the "top" epsilon in its AVs only.
     for n in G:
-        if not "latent" in G.node[n]:
+        if not "latent" in G.nodes[n]:
             faG.remove_edge(n, n + "'")
     return faG
 
@@ -159,12 +160,14 @@ def ICvar(G, y, known=set()):
     # Remove incoming edges to C
     cfaG = faG.copy()
     ied = set(cfaG.in_edges(C))
-    print(C,ied)
+    #print(C, ied)
     cfaG.remove_edges_from(ied)
 
     Sm, Tm = matchBlock(cfaG, C, T)
     _, T = flowSet(cfaG, C - Sm, T - Tm)
     T = T | Tm
+    # Returns 3 sets. S is all the source nodes. Next, is T\Tm, sink nodes that are not part of the match-block.
+    # Finally, Tm are the sink nodes that *are* part of the match-block, and we can identify t->y for t in Tm
     return S, {t[:-1] for t in T}, {t[:-1] for t in Tm}
 
 
@@ -174,7 +177,7 @@ def ICID(G, known=set()):
     while len(known) > lk:
         lk = len(known)
         for n in G:
-            if not "latent" in G.node[n]:
+            if not "latent" in G.nodes[n]:
                 _, _, v = ICvar(G, n, known)
                 for vi in v:
                     known.add((vi, n))
@@ -192,11 +195,11 @@ def ICID(G, known=set()):
 # x--y
 #
 # The above 3 lines represent the instrumental variable.
-import pyparsing as pp
 
 # Set up the variable names - var represents a node name
 varname = pp.Combine(
-    pp.Word(pp.alphanums + "_", exact=1) + pp.Optional(pp.Word(pp.alphanums + "_"))
+    pp.Word(pp.alphanums + "_", exact=1) +
+    pp.Optional(pp.Word(pp.alphanums + "_"))
 )
 arrow = pp.Or(["--", "->"])
 edge = pp.Group(varname + arrow + varname)
@@ -214,14 +217,14 @@ def generateGraph(txt):
             # Uh oh, latent alert!
             latentName = "U({},{})".format(edge[0], edge[2])
             G.add_edges_from([(latentName, edge[0]), (latentName, edge[2])])
-            G.node[latentName]["latent"] = True
+            G.nodes[latentName]["latent"] = True
     return G
 
 
 def pg(G):
     gstring = []
     for node in G:
-        if "latent" in G.node[node]:
+        if "latent" in G.nodes[node]:
             gstring.append("--".join(list(G.successors(node))))
         else:
             for succ in G.successors(node):
@@ -233,7 +236,8 @@ if __name__ == "__main__":
     G = generateGraph(
         # "z1->x1 z1->w z2->w w->x3 w->x2 w--y x1--y x2--y x3--y x1->y x2->y x3->y"
         # "w->z1 w->z2 z2->z1 z1->x1 z2->x2 x1->y x2->y x1--y x2--y w--y z1--w"
-        "x1->y x2->y x3->y x1--y x2--y x3--y w--y w->x2 w->x3 x1->w z1->x1 z2->w"
+        # "x1->y x2->y x3->y x1--y x2--y x3--y w--y w->x2 w->x3 x1->w z1->x1 z2->w"
+        "1->2 1->6 1--6 1--4 1->3 2->6 2->3 2->4 2->5 2--6 2--5 2--3 3->4 4->5"
     )
 
     # pg(vertexFlowGraph(G))
@@ -242,7 +246,6 @@ if __name__ == "__main__":
     # pg(auxGraph(G))
 
     # print(ICvar(G, "y"))
-    print(ICID(G))
+    print(ICvar(G, '5'))
 
     # print(closestMinCut(G, {"1", "2"}, {"5", "6"}))
-
