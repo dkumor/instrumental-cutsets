@@ -46,6 +46,8 @@ def flowSet(G, S, T):
 
 def matchBlock(G, S, T):
     tlen = 99999999
+
+    Sp = None
     while len(T) < tlen:
         # print("LOOP")
         tlen = len(T)
@@ -56,12 +58,12 @@ def matchBlock(G, S, T):
         for v in tNoFlow:
             tAn = tAn.union(nx.ancestors(G, v))
 
-        S = Sp - tAn
+        S = S - tAn
         T = Tp
         if len(S) == 0 or len(T) == 0:
             return set(), set()
 
-    return S, T
+    return Sp, T
 
 
 def closestMinCut(G, S, T):
